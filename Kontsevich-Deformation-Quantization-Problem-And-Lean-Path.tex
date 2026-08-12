@@ -1,0 +1,1253 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{comment}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\urlstyle{tt}
+\renewcommand\UrlBreaks{\do\.\do\@\do\\\do\/\do\!\do\_\do\?\do\&\do\=\do\-\do\:\do\;}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{assumption}[theorem]{Assumption}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\K}{\mathbb{K}}
+\newcommand{\HH}{\mathbb{H}}
+\newcommand{\Tpoly}{T_{\mathrm{poly}}}
+\newcommand{\Dpoly}{D_{\mathrm{poly}}}
+\newcommand{\Cinfty}{C^{\infty}}
+\newcommand{\Sch}[2]{[\,#1,#2\,]_{\mathrm{SN}}}
+\newcommand{\Ger}[2]{[\,#1,#2\,]_{\mathrm{G}}}
+\newcommand{\defi}[1]{\emph{#1}}
+
+\title{Kontsevich Deformation Quantization in Lean\\
+{\large Problem statement and a formalization path}}
+\author{Track 4 working note}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note states the deformation quantization problem solved by
+Kontsevich's formality theorem, fixes notation for every structure
+involved, and lays out a layered path for formalizing the result in
+Lean 4 / Mathlib. The note is intentionally minimal. It records what
+must be defined, what is already available in Mathlib, what is missing,
+and which subproblems can be attacked first. References are cited by
+paper, section, and result number throughout.
+\end{abstract}
+
+
+
+
+\section{Background and goal}\label{sec:background}
+
+Let $M$ be a smooth manifold. Write $T_M$ for its tangent bundle:
+\[
+T_M := \bigsqcup_{p \in M} T_pM,
+\]
+where $T_pM$ is the tangent vector space at $p$. A smooth vector field
+is a section of $T_M$, i.e.\ an element of $\Gamma(T_M)$. A bivector field is a section of $\Lambda^2 T_M$, i.e.\ an element of
+$\Gamma(\Lambda^2 T_M)$.
+
+A \defi{Poisson manifold} is a pair $(M,\pi)$ where $M$ is a smooth
+manifold and $\pi \in \Gamma(\Lambda^2 T_M)$ is a bivector field whose
+Schouten--Nijenhuis self-bracket vanishes:
+\[
+\Sch{\pi}{\pi}=0.
+\]
+This condition is equivalent to the Jacobi identity for the bracket
+\[
+\{f,g\} := \pi(df, dg), \qquad f,g \in \Cinfty(M).
+\]
+Thus $\{\,\cdot\,,\,\cdot\,\}$ is a Poisson bracket on $\Cinfty(M)$.
+In local coordinates, if
+\[
+\pi=\frac12\sum_{i,j}\pi^{ij}(x)\,\partial_i\wedge\partial_j,
+\]
+then $\Sch{\pi}{\pi}=0$ is equivalent to
+\[
+\sum_{\ell}
+\left(
+\pi^{i\ell}\partial_\ell\pi^{jk}
++ \pi^{j\ell}\partial_\ell\pi^{ki}
++ \pi^{k\ell}\partial_\ell\pi^{ij}
+\right)=0
+\qquad \text{for all } i,j,k.
+\]
+
+The problem posed by physics is to associate, to each
+$(M,\pi)$, an associative noncommutative product $\star$ on
+$\Cinfty(M)[[\hbar]]$ whose semiclassical limit is $\pi$. The precise
+notion is a star product (Bayen--Flato--Fronsdal--Lichnerowicz--Sternheimer
+\cite{BFFLS}).
+
+\begin{definition}\label{def:star}
+A \defi{star product} on $(M,\pi)$ is an $\R[[\hbar]]$-bilinear map
+\[
+\star \colon \Cinfty(M)[[\hbar]] \otimes_{\R[[\hbar]]} \Cinfty(M)[[\hbar]]
+\longrightarrow \Cinfty(M)[[\hbar]],
+\quad
+f \star g = fg + \sum_{k \ge 1} \hbar^{k}\, B_{k}(f,g),
+\]
+such that:
+\begin{enumerate}[label=(\roman*),leftmargin=2em]
+  \item each $B_{k}$ is a bidifferential operator on $M$;
+  \item $\star$ is associative;
+  \item $B_{1}(f,g) - B_{1}(g,f) = \{f,g\}$.
+\end{enumerate}
+Two star products $\star, \star'$ are \defi{gauge equivalent} if there
+exists $T = \mathrm{id} + \sum_{k\ge 1}\hbar^{k} T_{k}$ with $T_{k}$
+differential operators and $T(f \star g) = T f \star' T g$.
+\end{definition}
+
+\begin{example}[Standard Poisson structure]
+\label{ex:standard-poisson}
+Let $\R^{2m}$ have coordinates
+$(q_1,\dots,q_m,p_1,\dots,p_m)$. The bivector field
+\[
+\pi_0 := \sum_{i=1}^{m}
+\frac{\partial}{\partial q_i}\wedge
+\frac{\partial}{\partial p_i}
+\]
+is Poisson. Its coefficients are constant, hence
+$\Sch{\pi_0}{\pi_0}=0$. The induced bracket is
+\[
+\{f,g\}
+=\sum_{i=1}^{m}
+\left(
+\frac{\partial f}{\partial q_i}\frac{\partial g}{\partial p_i}
+-\frac{\partial f}{\partial p_i}\frac{\partial g}{\partial q_i}
+\right).
+\]
+\end{example}
+
+\begin{example}[The Moyal product]
+\label{ex:moyal-background}
+Fix an antisymmetric constant matrix $\pi^{ij}=-\pi^{ji}$ on $\R^d$
+and set
+$\pi = \tfrac{1}{2}\sum_{i,j}\pi^{ij}\,\partial_i\wedge\partial_j$.
+The Moyal product is
+\[
+f\star g
+=m\left(
+\exp\left(
+\frac{\hbar}{2}\sum_{i,j}\pi^{ij}\partial_i\otimes\partial_j
+\right)(f\otimes g)
+\right),
+\]
+where $m(f\otimes g)=fg$. Its first terms are
+\[
+f\star g
+=fg+\frac{\hbar}{2}\sum_{i,j}\pi^{ij}(\partial_i f)(\partial_j g)
++O(\hbar^2),
+\]
+so
+\[
+f\star g-g\star f=\hbar\{f,g\}+O(\hbar^2).
+\]
+\end{example}
+
+The goal of Kontsevich's formality theorem is to show that such a
+$\star$ exists for every Poisson structure, and to classify them up to
+gauge equivalence by Poisson structures up to formal diffeomorphism.
+
+\section{The two graded Lie algebras}\label{sec:two-gla}
+
+Kontsevich's framework expresses the problem as a comparison of two
+$L_\infty$-algebras built from $M$.
+
+\subsection{Polyvector fields}\label{ssec:Tpoly}
+
+\begin{definition}\label{def:Tpoly}
+For a smooth manifold $M$, set
+\[
+\Tpoly^{n}(M) := \Gamma\bigl(\Lambda^{n+1} T_M\bigr), \qquad n \ge -1.
+\]
+Equipped with the Schouten--Nijenhuis bracket $\Sch{\cdot}{\cdot}$ and
+zero differential, $\Tpoly(M)$ is a graded Lie algebra concentrated in
+degrees $\ge -1$.
+\end{definition}
+
+A Maurer--Cartan element of $\Tpoly(M)[[\hbar]]$ in degree~$1$ is an
+element $\pi = \hbar \pi_{1} + \hbar^{2} \pi_{2} + \cdots$ with
+$\pi_{k} \in \Gamma(\Lambda^{2} T_M)$ and $\Sch{\pi}{\pi} = 0$.
+
+\begin{example}[Polyvector fields on $\R^2$]
+\label{ex:polyvectors-r2}
+For $M=\R^2$ with coordinates $(x,y)$,
+\[
+\Tpoly^{-1}(M)=\Cinfty(M),\qquad
+\Tpoly^0(M)=\Gamma(T_M),\qquad
+\Tpoly^1(M)=\Gamma(\Lambda^2 T_M).
+\]
+A vector field is, for example,
+\[
+X=x\partial_x+y\partial_y.
+\]
+A bivector field is, for example,
+\[
+\pi=f(x,y)\partial_x\wedge\partial_y.
+\]
+Every bivector field on a surface is Poisson, because
+$\Sch{\pi}{\pi}$ is a trivector field and $\Lambda^3 T_M=0$.
+\end{example}
+
+\begin{example}[Polyvector fields on the Riemann sphere]
+\label{ex:polyvectors-cp1}
+Let $M = S^{2} \cong \mathbb{CP}^{1}$ viewed as a real $2$-manifold.
+Cover $M$ by two stereographic charts:
+\[
+U_{N} = M \setminus \{S\}, \ \ z = x+iy \in \C;
+\qquad
+U_{S} = M \setminus \{N\}, \ \ w = u+iv \in \C;
+\]
+with transition $w = 1/z$ on $U_{N} \cap U_{S}$.
+
+The tangent bundle $T_M$ is a real rank-$2$ vector bundle, locally
+trivialised by $(\partial_x, \partial_y)$ on $U_{N}$ and by
+$(\partial_u, \partial_v)$ on $U_{S}$. As a bundle over $S^{2}$ it
+is nontrivial: every smooth global vector field on $S^{2}$ has a
+zero (Hairy Ball Theorem). The polyvector-field grading is
+\[
+\Tpoly^{-1}(M) = \Cinfty(M),\qquad
+\Tpoly^{0}(M) = \Gamma(T_M),\qquad
+\Tpoly^{1}(M) = \Gamma(\Lambda^{2} T_M),
+\]
+and $\Tpoly^{n}(M) = 0$ for $n \ge 2$ because
+$\Lambda^{k} T_{p}M = 0$ for $k > \dim_{\R} M = 2$.
+
+The bundle $\Lambda^{2}T_M$ has real rank $\binom{2}{2} = 1$; a global
+section is a bivector field. On the two charts,
+\[
+\pi|_{U_{N}} = f(x,y)\, \partial_x \wedge \partial_y,
+\qquad
+\pi|_{U_{S}} = g(u,v)\, \partial_u \wedge \partial_v,
+\]
+with $f(x,y) = \det J(x,y) \cdot g(u(x,y), v(x,y))$ on the overlap,
+where $J = \partial(u,v)/\partial(x,y)$ is the Jacobian of the change
+of coordinates.
+
+A canonical choice of $\pi \in \Gamma(\Lambda^{2}T_M)$ comes from the
+Fubini--Study K\"ahler form
+\[
+\omega_{\mathrm{FS}}
+= \frac{i}{2}\,\frac{dz \wedge d\bar z}{(1+|z|^{2})^{2}}
+= \frac{dx \wedge dy}{(1+x^{2}+y^{2})^{2}},
+\]
+inverted to the bivector
+\[
+\pi_{\mathrm{FS}}|_{U_{N}}
+= (1+x^{2}+y^{2})^{2}\, \partial_x \wedge \partial_y,
+\qquad
+\pi_{\mathrm{FS}}|_{U_{S}}
+= (1+u^{2}+v^{2})^{2}\, \partial_u \wedge \partial_v.
+\]
+Both local expressions come from inverting the same intrinsic
+$\omega_{\mathrm{FS}}$, so they glue on $U_{N} \cap U_{S}$.
+
+Poisson-ness is automatic on $S^{2}$: for any
+$\pi \in \Gamma(\Lambda^{2}T_M)$, $\Sch{\pi}{\pi} \in
+\Gamma(\Lambda^{3} T_M) = 0$ by the same dimension argument. So
+$(S^{2}, \pi_{\mathrm{FS}})$ is a Poisson manifold, with bracket
+\[
+\{f, g\}(z)
+= (1+|z|^{2})^{2}
+\bigl(\partial_x f \cdot \partial_y g
+    - \partial_y f \cdot \partial_x g\bigr)
+\]
+on $U_{N}$. This is the Poisson bracket of the Fubini--Study
+symplectic structure and the input data for a Kontsevich star
+product on $S^{2}$.
+
+The holomorphic tangent bundle $T_{\mathbb{CP}^{1}}^{1,0} \cong
+\mathcal{O}(2)$ has complex rank $1$, so
+$\Lambda^{2} T_{\mathbb{CP}^{1}}^{1,0} = 0$. There is no non-trivial
+holomorphic Poisson structure on $\mathbb{CP}^{1}$. The Kontsevich
+framework as stated in Section~\ref{sec:background} uses the real
+tangent bundle for this reason.
+\end{example}
+
+\subsection{Polydifferential operators}\label{ssec:Dpoly}
+
+\begin{definition}\label{def:Dpoly}
+Let $A := \Cinfty(M)$. Define
+\[
+\Dpoly^{n}(M) := \bigl\{\,D \colon A^{\otimes (n+1)} \to A \;\big|\;
+D \text{ is polydifferential}\,\bigr\}, \qquad n \ge -1.
+\]
+The Hochschild differential $d_{\mathrm{H}} = [\mu, \,\cdot\,]_{\mathrm{G}}$,
+where $\mu$ is the pointwise product, and the Gerstenhaber bracket
+$\Ger{\cdot}{\cdot}$ make $\Dpoly(M)$ into a differential graded Lie
+algebra (Gerstenhaber \cite[\S6]{Gerstenhaber1963}).
+\end{definition}
+
+A Maurer--Cartan element of $\hbar\Dpoly(M)[[\hbar]]$ in degree~$1$ is
+$\pi = \hbar B_{1} + \hbar^{2} B_{2} + \cdots$ with each $B_{k}$
+bidifferential and
+\[
+d_{\mathrm{H}}\pi + \tfrac{1}{2}\Ger{\pi}{\pi}=0.
+\]
+This equation is equivalent to associativity of the deformed product
+$B := \mu + \pi = \mu + \hbar B_{1} + \hbar^{2} B_{2} + \cdots$. So
+MC elements of $\Dpoly$ are exactly star products.
+
+\begin{example}[A polydifferential operator]
+\label{ex:polydifferential}
+Let $A=\Cinfty(\R)$. The map
+\[
+D(f,g)=f'g''
+\]
+is a bidifferential operator, hence an element of $\Dpoly^1(\R)$.
+The ordinary product $\mu(f,g)=fg$ is also an element of $\Dpoly^1(M)$.
+The Gerstenhaber square measures the associator:
+\[
+\tfrac{1}{2}\,\Ger{\mu}{\mu}(f,g,h) = (fg)h - f(gh),
+\]
+so $\Ger{\mu}{\mu}=0$ is equivalent to associativity.
+\end{example}
+
+\subsection{The HKR map}\label{ssec:HKR}
+
+\begin{theorem}[Hochschild--Kostant--Rosenberg]\label{thm:HKR}
+The map $U_{\mathrm{HKR}} \colon \Tpoly(M) \to \Dpoly(M)$ defined by
+\[
+U_{\mathrm{HKR}}(\xi_{1} \wedge \cdots \wedge \xi_{n})(f_{1}, \dots, f_{n})
+:= \frac{1}{n!} \sum_{\sigma \in S_{n}} \mathrm{sgn}(\sigma)\,
+\xi_{\sigma(1)}(f_{1}) \cdots \xi_{\sigma(n)}(f_{n})
+\]
+is a quasi-isomorphism of cochain complexes.
+\end{theorem}
+
+The map $U_{\mathrm{HKR}}$ is \emph{not} a morphism of dg Lie algebras.
+The failure is the source of the problem. Kontsevich's theorem upgrades
+$U_{\mathrm{HKR}}$ to a structure that does respect the brackets, in a
+relaxed sense.
+
+\begin{example}[HKR on a decomposable bivector]
+\label{ex:hkr}
+For vector fields $X,Y$,
+\[
+U_{\mathrm{HKR}}(X\wedge Y)(f,g)
+=\frac12\left(X(f)Y(g)-Y(f)X(g)\right).
+\]
+Thus a bivector field becomes an antisymmetric bidifferential operator.
+\end{example}
+
+\section{\texorpdfstring{$L_\infty$}{L-infinity}-algebras and the formality theorem}\label{sec:Linfty}
+
+\begin{definition}\label{def:Linfty}
+An \defi{$L_\infty$-algebra} on a graded $\K$-module $L$ is a family of
+graded antisymmetric maps
+\[
+Q_{n} \colon L^{\wedge n} \to L, \qquad |Q_{n}| = 2 - n,\quad n \ge 1,
+\]
+satisfying the generalized Jacobi identities, for every $n \ge 1$,
+\begin{equation*}
+\sum_{i+j=n+1}\;\sum_{\sigma \in \mathrm{Sh}(i,n-i)}
+\mathrm{sgn}(\sigma)\, \varepsilon(\sigma)\,
+Q_{j}\!\bigl(Q_{i}(x_{\sigma(1)}, \dots, x_{\sigma(i)}),\;
+x_{\sigma(i+1)}, \dots, x_{\sigma(n)}\bigr) \;=\; 0,
+\end{equation*}
+where $\varepsilon(\sigma)$ is the Koszul sign and $\mathrm{Sh}(i, n-i)$
+is the set of $(i, n-i)$-shuffles.
+\end{definition}
+
+A differential graded Lie algebra $(L, d, [\cdot,\cdot])$ is the special
+case $Q_{1} = d$, $Q_{2} = [\cdot,\cdot]$, $Q_{n \ge 3} = 0$.
+
+\begin{example}[A dg Lie algebra as an $L_\infty$-algebra]
+\label{ex:dgla-linfty}
+If $(L,d,[\,\cdot\,,\,\cdot\,])$ is a differential graded Lie algebra,
+then it becomes an $L_\infty$-algebra by setting
+\[
+Q_1=d,\qquad Q_2=[\,\cdot\,,\,\cdot\,],\qquad Q_n=0\quad(n\ge3).
+\]
+The $n=1$ identity says $d^2=0$. The $n=2$ identity says that $d$ is
+compatible with the bracket. The $n=3$ identity says the graded Jacobi
+identity.
+\end{example}
+
+\begin{definition}\label{def:Linfty-morphism}
+An \defi{$L_\infty$-morphism} $U \colon (L, Q) \to (L', Q')$ is a family
+of graded antisymmetric maps
+\[
+U_{n} \colon L^{\wedge n} \to L', \qquad |U_{n}| = 1 - n,\quad n \ge 1,
+\]
+satisfying the compatibility identities of \cite[\S3.4]{Kontsevich2003}.
+The first component $U_{1}$ is a chain map $(L, Q_{1}) \to (L', Q'_{1})$.
+A morphism $U$ is a \defi{quasi-isomorphism} if $U_{1}$ is.
+\end{definition}
+
+\begin{definition}\label{def:MC}
+A \defi{Maurer--Cartan element} of an $L_\infty$-algebra $(L, Q)$ over
+$\hbar \K[[\hbar]]$ is $\alpha \in L^{1} \otimes \hbar \K[[\hbar]]$ such
+that
+\[
+\sum_{n \ge 1} \frac{1}{n!}\, Q_{n}(\alpha, \dots, \alpha) = 0.
+\]
+\end{definition}
+
+\begin{example}[Maurer--Cartan in a dg Lie algebra]
+\label{ex:mc-dgla}
+For a dg Lie algebra, the Maurer--Cartan equation is
+\[
+d\alpha+\frac12[\alpha,\alpha]=0.
+\]
+For $\Tpoly(M)$ the differential is zero, so the equation becomes
+$\Sch{\pi}{\pi}=0$. Thus Poisson bivectors are exactly
+Maurer--Cartan elements of $\Tpoly(M)$. For $\Dpoly(M)$, the same
+equation is associativity of the deformed product.
+\end{example}
+
+An $L_\infty$-morphism $U$ transports MC elements: if $\alpha$ is MC in
+$L$, then $\sum_{n \ge 1} \tfrac{1}{n!} U_{n}(\alpha, \dots, \alpha)$
+is MC in $L'$.
+
+\begin{theorem}[Kontsevich formality {\cite[Thm.~6.4]{Kontsevich2003}}]
+\label{thm:formality}
+For every smooth manifold $M$ there exists an $L_\infty$-quasi-isomorphism
+\[
+U \colon \Tpoly(M) \longrightarrow \Dpoly(M)
+\]
+whose first Taylor component $U_{1}$ equals $U_{\mathrm{HKR}}$ of
+Theorem~\ref{thm:HKR}.
+\end{theorem}
+
+\begin{corollary}[Quantization]\label{cor:quantization}
+For every Poisson structure $\pi$ on $M$, the formal series
+\[
+f \star g := fg + \sum_{n \ge 1} \frac{\hbar^{n}}{n!}\,
+U_{n}(\pi, \dots, \pi)(f, g)
+\]
+defines a star product on $(M, \pi)$, and the assignment
+$\pi \mapsto \star$ induces a bijection between formal Poisson
+structures modulo formal diffeomorphism and star products modulo gauge
+equivalence.
+\end{corollary}
+
+\begin{example}[How formality produces the star product]
+\label{ex:formality-star}
+For a Poisson bivector $\pi$, Kontsevich's maps $U_n$ produce
+\[
+f\star g
+=fg+\sum_{n\ge1}\frac{\hbar^n}{n!}U_n(\pi,\dots,\pi)(f,g).
+\]
+The $L_\infty$ identities say that the condition
+$\Sch{\pi}{\pi}=0$ is transported to the associativity of $\star$.
+\end{example}
+
+\section{The graphical formula on \texorpdfstring{$\R^{d}$}{R\^d}}
+\label{sec:graphs}
+
+For $M = \R^{d}$ Kontsevich constructs $U$ by an explicit sum over
+graphs. This is the formula that has to be implemented.
+
+\begin{definition}[Kontsevich admissible graph {\cite[\S6.1]{Kontsevich2003}}]
+\label{def:graph}
+For $n, m \ge 0$, an \defi{admissible graph} $\Gamma$ of type $(n, m)$
+is a finite directed graph with:
+\begin{itemize}[leftmargin=2em]
+  \item vertex set $V(\Gamma) = V_{1} \sqcup V_{2}$, where
+        $V_{1} = \{1, \dots, n\}$ are \defi{aerial} vertices and
+        $V_{2} = \{\bar 1, \dots, \bar m\}$ are \defi{ground} vertices;
+  \item each aerial vertex has exactly two outgoing edges, labelled
+        $(\cdot, 1)$ and $(\cdot, 2)$;
+  \item ground vertices have no outgoing edges;
+  \item no edge ends at its starting vertex; no two edges share both
+        endpoints.
+\end{itemize}
+Write $G_{n,m}$ for the (finite) set of admissible graphs of type
+$(n, m)$. Each $\Gamma \in G_{n,m}$ has $2n$ edges.
+\end{definition}
+
+\begin{remark}\label{rem:bivectors-only}
+The definition above matches Kontsevich's bivector case: every aerial
+vertex has outdegree $2$, so $B_{\Gamma}$ takes $n$ bivector fields as
+inputs. The general formality theorem allows aerial vertices of
+arbitrary outdegree $a_{k}+1$, with input a polyvector in
+$\Gamma(\Lambda^{a_{k}+1} T_M)$; in that case
+$|E(\Gamma)|=\sum_{k}(a_{k}+1)$. We restrict to outdegree $2$
+throughout because it suffices to construct the star product on a
+Poisson manifold.
+\end{remark}
+
+\begin{example}[The first admissible graph]
+\label{ex:first-graph}
+Take $n=1$ and $m=2$. There is one aerial vertex $1$ and two ground
+vertices $\bar1,\bar2$. Let the two outgoing edges from $1$ end at
+$\bar1$ and $\bar2$. This graph is the first-order graph in the
+Kontsevich formula.
+\end{example}
+
+\begin{definition}[Polydifferential operator $B_\Gamma$]
+\label{def:BGamma}
+For $\Gamma \in G_{n,m}$, bivector fields $\gamma_{1}, \dots, \gamma_{n}$
+on $\R^{d}$, and functions $f_{1}, \dots, f_{m} \in \Cinfty(\R^{d})$, set
+\[
+B_{\Gamma}(\gamma_{1}, \dots, \gamma_{n})(f_{1}, \dots, f_{m})
+:= \sum_{I \colon E(\Gamma) \to \{1, \dots, d\}}
+\prod_{k=1}^{n} \Bigl(\prod_{e \in \mathrm{in}(k)} \partial_{I(e)}\Bigr)
+\gamma_{k}^{I(e_{k,1}) I(e_{k,2})}
+\cdot
+\prod_{j=1}^{m} \Bigl(\prod_{e \in \mathrm{in}(\bar j)} \partial_{I(e)}\Bigr) f_{j},
+\]
+where $\mathrm{in}(v)$ is the multiset of edges ending at $v$ and
+$(e_{k,1}, e_{k,2})$ are the two outgoing edges at aerial vertex $k$.
+\end{definition}
+
+\begin{example}[The operator of the first graph]
+\label{ex:first-operator}
+For the graph in Example~\ref{ex:first-graph} and a bivector
+$\pi = \tfrac{1}{2}\sum_{i,j}\pi^{ij}\,\partial_i\wedge\partial_j$
+with $\pi^{ij}=-\pi^{ji}$,
+\[
+B_\Gamma(\pi)(f,g)
+=\sum_{i,j}\pi^{ij}(\partial_i f)(\partial_j g).
+\]
+The two labelings of the outgoing edges $(1\to\bar 1,\,1\to\bar 2)$
+versus $(1\to\bar 2,\,1\to\bar 1)$ contribute $\pi^{ij}$ and
+$\pi^{ji}$, and the antisymmetry of $\pi^{ij}$ folds them into a
+single term. This is the first-order bidifferential operator attached
+to the Poisson bracket.
+\end{example}
+
+\begin{definition}[Configuration space and weight]\label{def:weight}
+Let $\HH := \{z \in \C : \Im z > 0\}$. For $2n + m - 2 \ge 0$, set
+\[
+C_{n,m} := \bigl\{ (p_{1}, \dots, p_{n}; q_{1}, \dots, q_{m}) \in
+\HH^{n} \times \R^{m} \;\big|\; \text{all distinct},\ q_{1} < \cdots < q_{m} \bigr\}
+\;\bigm/\; G_{\mathrm{aff}},
+\]
+where $G_{\mathrm{aff}} = \{ z \mapsto az + b : a > 0,\ b \in \R\}$.
+Let $\bar C_{n,m}$ denote its Fulton--MacPherson--Axelrod--Singer
+compactification \cite[\S5]{Kontsevich2003}, a manifold with corners of
+dimension $2n + m - 2$.
+
+For an edge $e = (v_{1}, v_{2})$ of an admissible graph and a
+configuration in $C_{n,m}$, let
+$\phi_{e} \in \R / 2\pi\Z$ be the hyperbolic angle from the geodesic
+ray $v_{1} \to \infty$ in the Poincar\'e model of $\HH$ to the
+geodesic from $v_{1}$ to $v_{2}$.
+
+For $\Gamma \in G_{n,m}$ with $|E(\Gamma)| = 2n + m - 2$ define
+\[
+w_{\Gamma} :=
+\frac{1}{(2\pi)^{2n+m-2}}
+\int_{\bar C_{n,m}^{+}} \bigwedge_{e \in E(\Gamma)} d\phi_{e}\,,
+\]
+where $\bar C_{n,m}^{+}$ is the connected component in which the
+$q_{j}$ are ordered $q_{1}<\cdots<q_{m}$ on $\R$ and the wedge is
+taken in a fixed total order on $E(\Gamma)$. For all other $\Gamma$
+set $w_{\Gamma} := 0$. Since our aerial vertices have outdegree $2$,
+we have $|E(\Gamma)| = 2n$, and the condition
+$|E(\Gamma)|=2n+m-2$ forces $m = 2$: nonzero weights occur only for
+$\Gamma \in G_{n,2}$.
+\end{definition}
+
+\begin{example}[The configuration space $C_{1,2}$]
+\label{ex:config-12}
+For $n=1,m=2$, a configuration consists of one point
+$p_1\in\HH$ and two ordered real points $q_1<q_2$. Quotienting by
+$z\mapsto az+b$ with $a>0$ lets one normalize
+\[
+q_1=0,\qquad q_2=1.
+\]
+The remaining point $p_1$ varies in the upper half-plane. The graph
+weight integrates the angle form over the compactified version of this
+space.
+\end{example}
+
+\begin{theorem}[Kontsevich's explicit formality on $\R^{d}$
+{\cite[\S6.4]{Kontsevich2003}}]\label{thm:explicit}
+Restricted to bivectors, the maps
+\[
+U_{n}(\gamma_{1}, \dots, \gamma_{n})
+= \sum_{\Gamma \in G_{n,2}}
+w_{\Gamma}\, B_{\Gamma}(\gamma_{1}, \dots, \gamma_{n})
+\qquad (\gamma_{k} \in \Gamma(\Lambda^{2}T_{\R^{d}}))
+\]
+extend $U_{\mathrm{HKR}}$ and, together with their analogues on graphs
+with aerial vertices of higher outdegree (Remark~\ref{rem:bivectors-only}),
+assemble into an $L_\infty$-quasi-isomorphism
+$\Tpoly(\R^{d}) \to \Dpoly(\R^{d})$.
+The $L_\infty$ identities follow from Stokes' theorem: for each
+graph~$\Gamma$ appearing in a given identity, the closed form
+$\bigwedge_{e} d\phi_{e}$ on the compactified configuration space
+$\bar C_{n,m+1}^{+}$ has an integral that decomposes, via Stokes, into
+contributions from the codimension-$1$ boundary strata. These strata
+correspond bijectively to compositions of two admissible graphs, and
+the resulting sum is precisely the $L_\infty$ relation.
+\end{theorem}
+
+\begin{example}[Constant Poisson tensors]
+\label{ex:constant-poisson-graphs}
+If the coefficients $\pi^{ij}$ are constant, then every graph with an
+edge landing at an aerial vertex gives zero, because it differentiates
+a coefficient of $\pi$. Only graphs whose edges land on ground vertices
+survive. In this case Kontsevich's formula reduces to the Moyal product
+of Example~\ref{ex:moyal-background}.
+\end{example}
+
+\begin{example}[Boundary strata and Stokes' theorem]
+\label{ex:boundary-stokes}
+When points in a configuration collide, the compactification
+$\bar C_{n,m}$ records the limiting direction of the collision. These
+codimension-$1$ boundary faces correspond to compositions of graphs.
+Stokes' theorem says that the integral of an exact form over the
+compactified space is zero. The resulting sum of boundary contributions
+is precisely the $L_\infty$ identity for the maps $U_n$.
+\end{example}
+
+\section{Formalization path in Lean / Mathlib}\label{sec:lean}
+
+This section is the working plan for Track~4. The aim is to make
+Theorem~\ref{thm:formality} a Lean statement and then attack
+Theorem~\ref{thm:explicit} layer by layer.
+
+\begingroup
+\emergencystretch=3em
+\hbadness=10000
+
+\subsection{Available infrastructure in Mathlib}\label{ssec:available}
+
+Audited against Mathlib at commit \path{360da6fa66} (2026-06-18,
+toolchain \path{leanprover/lean4:v4.32.0-rc1}). The following are in
+Mathlib at a usable level.
+
+\emph{Linear and graded algebra.}
+\begin{itemize}[leftmargin=2em]
+  \item Tensor and exterior algebras of a module, in
+        \path{Mathlib.LinearAlgebra.TensorAlgebra.Basic}
+        (with grading in \path{TensorAlgebra.Grading}) and
+        \path{Mathlib.LinearAlgebra.ExteriorAlgebra.Basic}
+        (grading, basis, and construction from alternating maps in
+        the sibling files).
+  \item Exterior powers $\Lambda^{k} V$ and alternating multilinear
+        maps as first-class objects, in
+        \path{Mathlib.LinearAlgebra.ExteriorPower} and
+        \path{Mathlib.LinearAlgebra.Alternating}.
+  \item Graded monoids, graded rings, graded algebras, and graded
+        modules, in \path{Mathlib.Algebra.GradedMonoid},
+        \path{Mathlib.Algebra.GradedMulAction},
+        \path{Mathlib.Algebra.Module.GradedModule},
+        \path{Mathlib.Algebra.DirectSum.Algebra},
+        and \path{Mathlib.Algebra.DirectSum.Ring}.
+  \item Lie rings, Lie algebras, and Lie modules in
+        \path{Mathlib.Algebra.Lie.Basic}; graded Lie algebras in
+        \path{Mathlib.Algebra.Lie.Graded}.
+  \item Derivations of a commutative ring / algebra in
+        \path{Mathlib.RingTheory.Derivation.Basic}
+        (with the Lie-bracket instance in
+        \path{Mathlib.RingTheory.Derivation.Lie}).
+\end{itemize}
+
+\emph{Formal power series.}
+\begin{itemize}[leftmargin=2em]
+  \item Univariate formal power series (used for the coefficient ring
+        $\R[[\hbar]]$) in \path{Mathlib.RingTheory.PowerSeries.Basic},
+        with substitution, order, inverses, and truncation in the
+        sibling files.
+  \item Multivariate power series in
+        \path{Mathlib.RingTheory.MvPowerSeries.Basic}
+        with substitution and evaluation in the sibling files.
+\end{itemize}
+
+\emph{Homological algebra.}
+\begin{itemize}[leftmargin=2em]
+  \item Chain and cochain complexes over an abelian category
+        (\path{Mathlib.Algebra.Homology.HomologicalComplex},
+        \path{Mathlib.Algebra.Homology.CochainComplexPlus}), together
+        with quasi-isomorphisms
+        (\path{Mathlib.Algebra.Homology.QuasiIso}) and homology
+        functors. This is the dg framework we will wrap dg Lie
+        algebras around.
+\end{itemize}
+
+\emph{Smooth manifolds, tangent bundles, vector fields.}
+\begin{itemize}[leftmargin=2em]
+  \item Smooth manifolds via
+        \path{Mathlib.Geometry.Manifold.IsManifold.Basic}, built on
+        the \emph{ModelWithCorners} abstraction. So manifolds with
+        corners are supported at the level of models. Interior and
+        boundary of such a manifold, and the fact that they partition
+        it, live in
+        \path{Mathlib.Geometry.Manifold.IsManifold.InteriorBoundary}.
+  \item Tangent bundle as a $C^{n}$ vector bundle
+        (\path{Mathlib.Geometry.Manifold.VectorBundle.Tangent})
+        and smooth sections of a vector bundle
+        (\path{Mathlib.Geometry.Manifold.VectorBundle.ContMDiffSection}).
+  \item Point derivations of $\Cinfty(M)$ and the differential of a
+        smooth map, in
+        \path{Mathlib.Geometry.Manifold.DerivationBundle}.
+  \item Lie bracket of vector fields on a manifold, in
+        \path{Mathlib.Geometry.Manifold.VectorField.LieBracket}.
+\end{itemize}
+
+\emph{Differential forms and calculus.}
+\begin{itemize}[leftmargin=2em]
+  \item Exterior derivative of a differential form on a normed space
+        in \path{Mathlib.Analysis.Calculus.DifferentialForm.Basic}
+        (Kudryashov--Lindauer, 2025), with the Cartan-style pairing
+        against vector fields in \path{DifferentialForm.VectorField}.
+        Only defined on normed spaces so far: the file explicitly
+        lists ``bundled $C^{r}$-smooth $n$-forms on manifolds'' as a
+        TODO.
+\end{itemize}
+
+\subsection{Missing infrastructure}\label{ssec:missing}
+
+The audit above shows the following are absent from Mathlib. Each
+gap becomes a workstream in Section~\ref{sec:milestones}.
+
+\emph{Homotopical algebra.}
+\begin{itemize}[leftmargin=2em]
+  \item $L_\infty$-algebras and $L_\infty$-morphisms with Koszul
+        signs. No \path{LInftyAlgebra}, no \path{MaurerCartan},
+        nothing in Mathlib on either.
+  \item Maurer--Cartan elements of a dg Lie or $L_\infty$-algebra,
+        and gauge equivalence over $\hbar \K[[\hbar]]$.
+  \item Operads and algebras over operads (needed only for the
+        Tamarkin alternative in Section~\ref{ssec:alternatives}).
+\end{itemize}
+
+\emph{Hochschild theory of associative algebras.}
+\begin{itemize}[leftmargin=2em]
+  \item Hochschild cochain complex of an associative algebra $A$
+        (multilinear maps $A^{\otimes n} \to A$ with the Hochschild
+        differential). A repository-wide search returns exactly one
+        mention of ``Hochschild'', a comment on the Hochschild--Serre
+        spectral sequence in group cohomology; there is no Hochschild
+        homology or cohomology of associative algebras in Mathlib.
+  \item Gerstenhaber bracket on that complex; the associated dg Lie
+        structure; the fact that MC elements are deformations of the
+        product.
+\end{itemize}
+
+\emph{Poisson / polyvector-field side.}
+\begin{itemize}[leftmargin=2em]
+  \item Polyvector fields $\Gamma(\Lambda^{n+1} T_M)$ as a graded
+        $\Cinfty(M)$-module. The pieces exist (exterior power of a
+        module; tangent bundle; smooth sections) but not the graded
+        object $\Tpoly(M)$.
+  \item Schouten--Nijenhuis bracket on $\Tpoly(M)$, its Jacobi
+        identity, and the vanishing of $\Sch{\cdot}{\cdot}$ on
+        functions.
+  \item Poisson manifolds, Poisson brackets, the equivalence
+        between Poisson bivectors and Lie brackets on $\Cinfty(M)$.
+        Grep for ``Poisson'' in \path{Mathlib/Geometry} returns
+        nothing; the existing hits under \path{Analysis} are the
+        Poisson kernel and Poisson summation, unrelated.
+\end{itemize}
+
+\emph{Polydifferential operators on $\Cinfty(M)$.}
+\begin{itemize}[leftmargin=2em]
+  \item Polydifferential operators as a concrete subtype of
+        $\Cinfty(M)^{\otimes\bullet} \to \Cinfty(M)$. On $\R^{d}$
+        with polynomial coefficients this is a routine algebraic
+        subtype; on a general manifold it requires jet bundles.
+  \item Star products on $(M,\pi)$ and gauge equivalence between
+        them.
+\end{itemize}
+
+\emph{Forms, integration, corners.}
+\begin{itemize}[leftmargin=2em]
+  \item Differential forms on manifolds (Mathlib has them only on
+        normed spaces, per the file \path{DifferentialForm/Basic.lean}
+        TODO).
+  \item Integration of differential forms on an oriented manifold,
+        including the case of a manifold with corners.
+  \item Stokes' theorem for manifolds with corners. The abstract
+        model \emph{ModelWithCorners} is available and boundary points
+        are defined, but there is no integration theory that uses
+        them.
+\end{itemize}
+
+\emph{Configuration spaces.}
+\begin{itemize}[leftmargin=2em]
+  \item Kontsevich admissible graphs $G_{n,m}$ as a finite decidable
+        type.
+  \item Fulton--MacPherson--Axelrod--Singer compactifications
+        $\bar C_{n,m}$, their manifold-with-corners structure, and
+        the identification of codimension-$1$ boundary strata with
+        compositions of smaller configuration spaces.
+  \item The Kontsevich angle 1-form $d\phi_{e}$ on
+        $\bar C_{n,m}^{+}$ and the weight integrals $w_{\Gamma}$.
+\end{itemize}
+
+\endgroup
+
+\begingroup
+\emergencystretch=3em
+\hbadness=10000
+
+\subsection{Task decomposition for the initial team}\label{ssec:tasks}
+
+The six workstreams of Section~\ref{ssec:missing} split into atomic
+tasks. Each task fixes a Lean module path, a mathematical statement,
+its dependencies among other tasks, and a target sorry count. The
+sorry-count target is $0$ for algebraic tasks and equals the number
+of documented axiom blocks for tasks that isolate the analytic input.
+Effort estimates are $S$ (one to two weeks), $M$ (two to four weeks),
+$L$ (four to eight weeks) for a Lean-fluent contributor. The task
+graph is laid out so that Workstream~A, and the first task of each
+other workstream, can be started in parallel on day one and produce a
+visible artefact within two weeks.
+
+\paragraph{Workstream A. Combinatorial and polynomial scaffolding.}
+Foundational Lean-typeclass work. No non-trivial mathematics.
+Serves as the entry point for contributors calibrating their Lean.
+\begin{itemize}[leftmargin=2em]
+  \item[\textbf{A1}]
+    \defi{Admissible graphs as a decidable finite type.} $S$.
+    Module \path{Kontsevich.Combinatorics.AdmissibleGraph}. Implement
+    the structure of Definition~\ref{def:graph} with
+    \texttt{DecidableEq} and a \texttt{Fintype} instance on
+    $G_{n,m}$. Deliverable: \texttt{\#eval} enumerates $G_{1,2}$
+    (one graph), $G_{2,2}$ (four graphs after edge labelling), and
+    $G_{3,2}$. Depends on: none.
+  \item[\textbf{A2}]
+    \defi{Polynomial ring on $\R^{d}$ as an ambient algebra.} $S$.
+    Module \path{Kontsevich.Polynomial.RdPoly}. Wrap
+    \path{Mathlib.Algebra.MvPolynomial.Basic} with the smooth-function
+    interpretation: coordinate derivations
+    $\partial_{i}$ as \path{MvPolynomial.derivation}, and a lemma
+    that they commute pairwise. Depends on: none.
+  \item[\textbf{A3}]
+    \defi{Polynomial polyvector fields on $\R^{d}$.} $S$.
+    Module \path{Kontsevich.Polynomial.Tpoly}. Define
+    $\Tpoly^{n}(\R^{d})_{\mathrm{poly}}$ as
+    $\R[x_{1},\dots,x_{d}] \otimes \Lambda^{n+1} \R^{d}$ using
+    \path{Mathlib.LinearAlgebra.ExteriorPower}. Depends on: A2.
+  \item[\textbf{A4}]
+    \defi{Polynomial polydifferential operators on $\R^{d}$.} $M$.
+    Module \path{Kontsevich.Polynomial.Dpoly}. Define
+    $\Dpoly^{n}(\R^{d})_{\mathrm{poly}}$ as multilinear maps
+    $\R[x]^{\otimes(n+1)} \to \R[x]$ whose action factors as a
+    finite polynomial combination of $\partial^{\alpha}$'s. Depends
+    on: A2.
+  \item[\textbf{A5}]
+    \defi{The operator $B_{\Gamma}$ in polynomial coefficients.}
+    $M$. Module \path{Kontsevich.Polynomial.BGamma}. Implement
+    Definition~\ref{def:BGamma} for
+    $\gamma_{k} \in \Tpoly^{1}(\R^{d})_{\mathrm{poly}}$ and
+    $f_{j} \in \R[x]$. Depends on: A1, A3, A4.
+  \item[\textbf{A6}]
+    \defi{Kontsevich weights as an axiomatised black box.} $S$.
+    Module \path{Kontsevich.Analysis.WeightAxiom}. Declare
+    $w \colon G_{n,2} \to \R$ as an \texttt{axiom} for each $n$, with
+    the values for $n = 1, 2$ substituted by the closed-form rationals
+    from \cite[\S8.3]{Kontsevich2003}. Weights for $n \ge 3$ stay
+    abstract. Depends on: A1.
+\end{itemize}
+
+\paragraph{Workstream B. Graded and Lie infrastructure.}
+Bridges Mathlib's existing typeclasses to the dg Lie structures the
+project needs. Runs in parallel with A.
+\begin{itemize}[leftmargin=2em]
+  \item[\textbf{B1}]
+    \defi{dg Lie algebra wrapper on Mathlib.} $S$ to $M$. Module
+    \path{Kontsevich.Algebra.DGLie}. Assemble a \texttt{DGLA}
+    structure from \path{Mathlib.Algebra.Homology.HomologicalComplex}
+    over the category of vector spaces and
+    \path{Mathlib.Algebra.Lie.Basic}. Prove Jacobi and the Leibniz
+    rule for $d$ as instance obligations. Depends on: none.
+  \item[\textbf{B2}]
+    \defi{Schouten--Nijenhuis bracket on
+          $\Tpoly(\R^{d})_{\mathrm{poly}}$.} $M$. Module
+    \path{Kontsevich.Polynomial.Schouten}. Implement
+    $\Sch{\cdot}{\cdot}$ via the local-coordinate formula, prove
+    graded antisymmetry and the graded Jacobi identity. Deliverable:
+    theorems \texttt{schouten\_antisymm} and \texttt{schouten\_jacobi}.
+    Depends on: A2, A3.
+  \item[\textbf{B3}]
+    \defi{Gerstenhaber bracket on
+          $\Dpoly(\R^{d})_{\mathrm{poly}}$.} $M$. Module
+    \path{Kontsevich.Polynomial.Gerstenhaber}. Implement
+    $\Ger{\cdot}{\cdot}$ via the sum-over-insertions formula
+    (\cite{Gerstenhaber1963}, \S6), prove graded antisymmetry and
+    graded Jacobi. Depends on: A2, A4.
+  \item[\textbf{B4}]
+    \defi{Hochschild differential and $d_{\mathrm{H}}^{2}=0$.} $S$.
+    Module \path{Kontsevich.Polynomial.Hochschild}. Set
+    $d_{\mathrm{H}} := \Ger{\mu}{\cdot}$ where $\mu$ is the pointwise
+    product. Prove $d_{\mathrm{H}}^{2} = 0$ by expanding
+    $\Ger{\Ger{\mu}{\mu}}{\cdot}$. Depends on: B3.
+  \item[\textbf{B5}]
+    \defi{Two dg Lie instances.} $S$. Module
+    \path{Kontsevich.Polynomial.DGLieInstances}. Register
+    $\Tpoly(\R^{d})_{\mathrm{poly}}$ (with zero differential) and
+    $\Dpoly(\R^{d})_{\mathrm{poly}}$ (with differential
+    $d_{\mathrm{H}}$) as \texttt{DGLA} instances via B1. Depends on:
+    B1, B2, B4.
+\end{itemize}
+
+\paragraph{Workstream C. Hochschild--Kostant--Rosenberg.}
+Bridges the two dg Lie algebras of Workstream~B. Contains the first
+non-trivial theorem the team can point at.
+\begin{itemize}[leftmargin=2em]
+  \item[\textbf{C1}]
+    \defi{$U_{\mathrm{HKR}}$ as a graded linear map.} $S$. Module
+    \path{Kontsevich.Polynomial.HKR}. Define
+    $U_{\mathrm{HKR}} \colon \Tpoly(\R^{d})_{\mathrm{poly}}
+    \to \Dpoly(\R^{d})_{\mathrm{poly}}$ by
+    Theorem~\ref{thm:HKR}. Depends on: A3, A4.
+  \item[\textbf{C2}]
+    \defi{$U_{\mathrm{HKR}}$ is a chain map.} $M$. Same module.
+    Prove $d_{\mathrm{H}} \circ U_{\mathrm{HKR}} = 0$ (the domain has
+    zero differential). Depends on: B4, C1.
+  \item[\textbf{C3}]
+    \defi{$U_{\mathrm{HKR}}$ is a quasi-isomorphism on
+          $\R^{d}$-polynomials.} $M$ to $L$. Module
+    \path{Kontsevich.Polynomial.HKRQuasiIso}. Compute Hochschild
+    cohomology of $\R[x_{1},\dots,x_{d}]$ using the Koszul
+    resolution and match it to $\Tpoly(\R^{d})_{\mathrm{poly}}$.
+    Depends on: C2.
+\end{itemize}
+
+\paragraph{Workstream D. $L_\infty$ machinery and Maurer--Cartan.}
+The sign-heavy homotopical algebra core. Sign conventions are fixed
+in D1 and cited by label everywhere else in the project.
+\begin{itemize}[leftmargin=2em]
+  \item[\textbf{D1}]
+    \defi{$L_\infty$-algebra typeclass with Koszul signs.} $L$.
+    Module \path{Kontsevich.LInfty.Algebra}. Implement
+    Definition~\ref{def:Linfty}. Fix the sign convention of
+    \cite[\S3.4]{Kontsevich2003} in an \texttt{assumption} block and
+    prove the $n=1,2,3$ special cases. Depends on: none.
+  \item[\textbf{D2}]
+    \defi{$L_\infty$-morphism typeclass.} $M$. Module
+    \path{Kontsevich.LInfty.Morphism}. Implement
+    Definition~\ref{def:Linfty-morphism} and the
+    quasi-isomorphism predicate on $U_{1}$. Depends on: D1.
+  \item[\textbf{D3}]
+    \defi{Embedding of dg Lie algebras into $L_\infty$-algebras.} $S$.
+    Module \path{Kontsevich.LInfty.FromDGLA}. Prove that a
+    \texttt{DGLA} is an $L_\infty$-algebra with $Q_{n} = 0$ for
+    $n \ge 3$. Depends on: B1, D1.
+  \item[\textbf{D4}]
+    \defi{Maurer--Cartan elements over $\hbar \K[[\hbar]]$.} $M$.
+    Module \path{Kontsevich.LInfty.MaurerCartan}. Implement
+    Definition~\ref{def:MC}. Prove that MC elements of a dg Lie
+    algebra satisfy $d\alpha + \tfrac{1}{2}[\alpha,\alpha] = 0$.
+    Depends on: D1.
+  \item[\textbf{D5}]
+    \defi{Gauge equivalence of MC elements.} $M$ to $L$. Module
+    \path{Kontsevich.LInfty.Gauge}. Implement the exponential action
+    of degree-$0$ elements and prove that gauge equivalence is an
+    equivalence relation on MC elements. Depends on: D4.
+  \item[\textbf{D6}]
+    \defi{MC transport under $L_\infty$-morphisms.} $M$. Module
+    \path{Kontsevich.LInfty.MCTransport}. Prove that
+    $\alpha \mapsto \sum_{n\ge 1} \tfrac{1}{n!} U_{n}(\alpha^{\wedge n})$
+    sends MC to MC. Depends on: D2, D4.
+\end{itemize}
+
+\paragraph{Workstream E. Kontsevich formula on $\R^{d}$.}
+Assembles A--D into the polynomial-coefficient formality statement.
+\begin{itemize}[leftmargin=2em]
+  \item[\textbf{E1}]
+    \defi{The map $U_{n}$ in polynomial coefficients.} $M$. Module
+    \path{Kontsevich.Formula.U}. Define
+    $U_{n} := \sum_{\Gamma \in G_{n,2}} w_{\Gamma}\, B_{\Gamma}$
+    as a map
+    $\bigl(\Tpoly^{1}(\R^{d})_{\mathrm{poly}}\bigr)^{\wedge n}
+    \to \Dpoly^{1}(\R^{d})_{\mathrm{poly}}$. Prove $U_{1}$ equals
+    $U_{\mathrm{HKR}}$ restricted to bivectors. Depends on: A5, A6,
+    C1.
+  \item[\textbf{E2}]
+    \defi{The Moyal product from the Kontsevich formula.} $M$.
+    Module \path{Kontsevich.Formula.Moyal}. Specialise E1 to
+    constant $\pi$ and prove the resulting star product equals the
+    Moyal product of Example~\ref{ex:moyal-background}. Prove
+    associativity directly by graph enumeration for $n \le 3$ and
+    inductively for general $n$. Depends on: A5, E1.
+  \item[\textbf{E3}]
+    \defi{$L_\infty$ identities modulo boundary axioms.} $L$.
+    Module \path{Kontsevich.Formula.LInftyIds}. Prove that the maps
+    $U_{n}$ of E1 satisfy the $L_\infty$ identities of D1 modulo an
+    explicit \texttt{axiom} block encoding the boundary identities
+    of Theorem~\ref{thm:explicit}. Sorry count: $0$; axiom count:
+    one per required boundary vanishing. Depends on: B5, D3, D6, E1.
+  \item[\textbf{E4}]
+    \defi{Star-product corollary.} $M$. Module
+    \path{Kontsevich.Formula.StarProduct}. Deduce
+    Corollary~\ref{cor:quantization} for polynomial Poisson tensors
+    on $\R^{d}$: the series
+    $f\star g = fg + \sum_{n\ge 1} \tfrac{\hbar^{n}}{n!}
+    U_{n}(\pi,\dots,\pi)(f,g)$ is associative. Depends on: D6, E3.
+\end{itemize}
+
+\paragraph{Workstream F. Analytic input (phase two).}
+Discharges the axioms of A6 and E3. This workstream is deferred
+until Workstreams A--E deliver Milestones~1--8 of
+Section~\ref{sec:milestones}; documented here so that the axiom
+count of E3 is bounded by a concrete list.
+\begin{itemize}[leftmargin=2em]
+  \item[\textbf{F1}]
+    \defi{Configuration space $C_{n,m}$ as a smooth manifold.} $L$.
+    Module \path{Kontsevich.Analytic.Config}. Define $C_{n,m}$ and
+    equip it with the smooth structure from
+    Definition~\ref{def:weight}. Depends on: A1.
+  \item[\textbf{F2}]
+    \defi{The Kontsevich angle 1-form $d\phi_{e}$.} $M$. Module
+    \path{Kontsevich.Analytic.AngleForm}. Depends on: F1.
+  \item[\textbf{F3}]
+    \defi{Compactification $\bar C_{n,m}$ as a manifold with
+          corners.} $L$. Module \path{Kontsevich.Analytic.Compactify}.
+    Build the Fulton--MacPherson--Axelrod--Singer compactification.
+    Identify the codimension-$1$ boundary strata. Depends on: F1.
+  \item[\textbf{F4}]
+    \defi{Stokes' theorem on $\bar C_{n,m}^{+}$ and boundary
+          vanishing.} $L$. Module \path{Kontsevich.Analytic.Stokes}.
+    Discharge the axiom block of E3. Depends on: F2, F3.
+  \item[\textbf{F5}]
+    \defi{Weight computation for low $n$.} $S$ to $M$. Module
+    \path{Kontsevich.Analytic.WeightsLow}. Replace the axiomatised
+    values of A6 for $n = 1, 2$ with theorems that evaluate the
+    integral $w_{\Gamma}$. Depends on: F2, F3.
+\end{itemize}
+
+\paragraph{Suggested allocation.}
+A team of six to eight contributors of mixed Lean fluency covers the
+six workstreams. A workable initial mapping:
+two contributors on Workstream~A (foundational Lean, junior
+friendly), one on B1 shared with two more on B2--B5 (mid-level Lean
+plus one algebraist per bracket), one on Workstream~C (algebraic
+depth), one to two on Workstream~D (sign-heavy, senior Lean), and
+one shared coordinator on Workstream~E. Workstream~F is deferred.
+The task graph has three cut points that gate visible team
+progress: A5+A6 (a runnable $B_{\Gamma}$ on graphs), B2+B3
+(the two brackets), and E2 (the Moyal product as a Kontsevich
+computation). Each cut point yields a self-contained artefact that
+can be reviewed independently.
+
+\endgroup
+
+\subsection{Layered plan}\label{ssec:plan}
+
+\paragraph{Layer 0 (Combinatorial scaffolding).}
+Implement \texttt{AdmissibleGraph (n m : Nat)} from
+Definition~\ref{def:graph} as a finite, decidable structure. Build the
+polynomial-coefficient version of $B_{\Gamma}$ on $\R^{d}$ acting on
+polynomial functions. Axiomatize $w_{\Gamma} : \mathbb{Q}_{\Gamma} \to \R$
+as a real-valued constant per graph, postponing its integral definition.
+This layer is purely finite and decidable. It is testable: for small
+$n, m$ one can check the Kontsevich formula returns the Moyal product
+on the constant Poisson structure.
+
+\paragraph{Layer 1. Algebraic $L_\infty$.}
+Define \texttt{LInftyAlgebra (V : Type*) [GradedModule V]} with the
+maps $Q_{n}$ of Definition~\ref{def:Linfty} and the generalized Jacobi
+identities. Define \texttt{LInftyMorphism} per
+Definition~\ref{def:Linfty-morphism}. Construct the dg-Lie embedding
+$\mathrm{DGLA} \hookrightarrow L_\infty\mathrm{-Alg}$. Define Maurer--Cartan
+elements and gauge equivalence over $\hbar \K[[\hbar]]$.
+Sign conventions follow \cite[\S4]{Kontsevich2003}; they must be
+declared once and reused.
+
+\paragraph{Layer 2. Concrete dg-Lie algebras.}
+For $V = \R^{d}$, define $\Tpoly(\R^{d})_{\mathrm{poly}}$ as polynomial
+polyvector fields with the Schouten--Nijenhuis bracket; this avoids
+analysis. Define $\Dpoly(\R^{d})_{\mathrm{poly}}$ as polydifferential
+operators with polynomial coefficients, with the Gerstenhaber bracket
+and Hochschild differential. Prove $U_{\mathrm{HKR}}$ is a chain map
+(Theorem~\ref{thm:HKR}) in this polynomial setting.
+
+\paragraph{Layer 3. Formality.}
+With the axiomatized weights of Layer~0 and the algebraic infrastructure
+of Layers~1--2, prove that the maps $U_{n}$ of Theorem~\ref{thm:explicit}
+define an $L_\infty$-morphism modulo a single hypothesis: the boundary
+integrals on $\bar C_{n,m+1}^{+}$ vanish in the combinations required
+by the $L_\infty$ identities. The hypothesis is the only analytic
+input; everything else is finite combinatorics with rational
+coefficients.
+
+\paragraph{Layer 4. Discharging the analytic hypothesis.}
+Two routes are available.
+\begin{enumerate}[label=(\alph*),leftmargin=2em]
+  \item Build the integration theory: compactified configuration
+        spaces, integration of forms on manifolds with corners,
+        Stokes' theorem with corners. Then prove the boundary
+        vanishing directly.
+  \item Replace the analytic input by an axiom block citing
+        \cite[\S6]{Kontsevich2003} and document the gap. This is the
+        recommended starting point.
+\end{enumerate}
+
+\subsection{Subproblems that can be closed without analysis}
+\label{ssec:no-analysis}
+
+Two reduced problems are fully algebraic and can be formalized today:
+\begin{itemize}[leftmargin=2em]
+  \item \defi{Linear Poisson structures on $\mathfrak{g}^{*}$.} The
+        restriction of $U$ to linear Poisson tensors on the dual of a
+        finite-dimensional Lie algebra $\mathfrak{g}$ equals the
+        symmetrization map $\mathrm{Sym}(\mathfrak{g}) \to
+        \mathcal{U}(\mathfrak{g})$ composed with the Duflo isomorphism
+        (Kathotia \cite[Thm.~1.1]{Kathotia2000}, Shoikhet
+        \cite{Shoikhet2001}). The PBW theorem and the Duflo factor
+        can be formalized without configuration-space integrals.
+  \item \defi{The Moyal product.} For constant Poisson structures on
+        $\R^{d}$, all weights $w_{\Gamma}$ with $\Gamma$ having edges
+        among aerial vertices vanish, and the formula reduces to the
+        exponential of $\hbar \pi^{ij} \partial_{i} \otimes
+        \partial_{j} / 2$. This is the natural first end-to-end
+        verification target.
+\end{itemize}
+
+\subsection{Challenges}\label{ssec:challenges}
+
+\begin{itemize}[leftmargin=2em]
+  \item \defi{Sign conventions.} Koszul signs in the $L_\infty$
+        identities are the dominant source of errors in any
+        formalization of homotopical algebra. They must be fixed in
+        Layer~1 and never revisited.
+  \item \defi{Transcendental weights.} The numbers $w_{\Gamma}$ are
+        periods of differential forms on manifolds with corners. Some
+        are known closed form (e.g.\ wheel weights are computed in
+        \cite{Shoikhet2001}); most are not. Axiomatization is required
+        unless one ports the integration theory.
+  \item \defi{Polydifferential operators.} A faithful Lean type for
+        polydifferential operators on $\Cinfty(M)$ requires a careful
+        treatment of jet bundles or local coordinate charts. Starting
+        with polynomial coefficients on $\R^{d}$ side-steps this.
+  \item \defi{Gauge equivalence.} The classification statement in
+        Corollary~\ref{cor:quantization} requires gauge equivalence of
+        MC elements modulo $\hbar$, which requires the full $L_\infty$
+        machinery, including the homotopy transfer needed for
+        equivalences.
+  \item \defi{Globalization.} Kontsevich's $\R^{d}$ formula globalizes
+        to manifolds by Fedosov-style methods
+        (Cattaneo--Felder--Tomassini \cite{CFT}, Dolgushev
+        \cite{Dolgushev2005}). This is a second-stage project. It
+        depends on a connection / formal geometry layer in Mathlib
+        that does not yet exist.
+\end{itemize}
+
+\subsection{Alternative approaches}\label{ssec:alternatives}
+
+\begin{itemize}[leftmargin=2em]
+  \item \defi{Tamarkin's proof} \cite{Tamarkin}. Replaces the
+        configuration-space integrals by the formality of the little
+        disks operad $E_{2}$ and a choice of Drinfeld associator. This
+        is more algebraic and avoids analysis, but requires operad
+        theory in Mathlib, which is also missing.
+  \item \defi{Cattaneo--Felder Poisson sigma model} \cite{CF}. Gives
+        $w_{\Gamma}$ as expectation values of a topological field
+        theory on the disk. Not directly formalizable, but a useful
+        guide for interpreting the boundary identities of
+        Theorem~\ref{thm:explicit}.
+  \item \defi{Manchon--Torossian} \cite{MT}. Refines the tangent
+        cohomology of the Kontsevich star product and gives sharper
+        statements at the level of cup products. A target for
+        formalization once the base layer is in place.
+\end{itemize}
+
+\section{Concrete first milestones}\label{sec:milestones}
+
+The proposed sequence of milestones, each independently verifiable:
+\begin{enumerate}[leftmargin=2em]
+  \item \texttt{AdmissibleGraph} type with decidable equality and
+        enumeration; unit tests against \cite[\S6.1]{Kontsevich2003}.
+  \item \texttt{LInftyAlgebra} structure with Koszul signs; the
+        embedding $\mathrm{DGLA} \hookrightarrow L_\infty\mathrm{-Alg}$.
+  \item Schouten--Nijenhuis bracket on polynomial polyvector fields on
+        $\R^{d}$; Jacobi identity proved.
+  \item Gerstenhaber bracket on polynomial polydifferential operators
+        on $\R^{d}$; Hochschild differential proved square-zero.
+  \item Theorem~\ref{thm:HKR} as a Lean theorem in the polynomial
+        setting.
+  \item Moyal product as the Kontsevich formula evaluated on constant
+        $\pi$; associativity proved by graph enumeration.
+  \item PBW-symmetrization formula for linear $\pi$ on
+        $\mathfrak{g}^{*}$; Duflo factor handled as an axiom on first
+        pass.
+  \item Statement of Theorem~\ref{thm:formality} with axiomatized
+        weights; the $L_\infty$ identities reduced to the boundary
+        hypothesis.
+\end{enumerate}
+
+Milestones~1--6 are fully algebraic and have no analytic axioms.
+Milestone~7 has one axiom (the Duflo factor) that is independently
+documentable. Milestone~8 is the cleanest target for a first paper.
+
+\begingroup
+\emergencystretch=3em
+\hbadness=10000
+\begin{thebibliography}{99}
+
+\bibitem{BFFLS}
+F.~Bayen, M.~Flato, C.~Fronsdal, A.~Lichnerowicz, D.~Sternheimer,
+\emph{Deformation theory and quantization. I. Deformations of
+symplectic structures}, Ann. Physics \textbf{111} (1978), 61--110.
+
+\bibitem{CF}
+A.~S.~Cattaneo, G.~Felder,
+\emph{A path integral approach to the Kontsevich quantization formula},
+Comm. Math. Phys. \textbf{212} (2000), 591--611.
+
+\bibitem{CFT}
+A.~S.~Cattaneo, G.~Felder, L.~Tomassini,
+\emph{From local to global deformation quantization of Poisson
+manifolds}, Duke Math. J. \textbf{115} (2002), 329--352.
+
+\bibitem{Dolgushev2005}
+V.~Dolgushev,
+\emph{Covariant and equivariant formality theorems},
+Adv. Math. \textbf{191} (2005), 147--177.
+
+\bibitem{Gerstenhaber1963}
+M.~Gerstenhaber,
+\emph{The cohomology structure of an associative ring},
+Ann. of Math. (2) \textbf{78} (1963), 267--288.
+
+\bibitem{Kathotia2000}
+V.~Kathotia,
+\emph{Kontsevich's universal formula for deformation quantization and
+the Campbell--Baker--Hausdorff formula},
+Internat. J. Math. \textbf{11} (2000), 523--551.
+
+\bibitem{Kontsevich1999}
+M.~Kontsevich,
+\emph{Operads and motives in deformation quantization},
+Lett. Math. Phys. \textbf{48} (1999), 35--72.
+
+\bibitem{Kontsevich2003}
+M.~Kontsevich,
+\emph{Deformation quantization of Poisson manifolds},
+Lett. Math. Phys. \textbf{66} (2003), 157--216.
+arXiv:q-alg/9709040.
+
+\bibitem{MT}
+D.~Manchon, C.~Torossian,
+\emph{Cohomologie tangente et cup-produit pour la quantification de
+Kontsevich}, Ann. Math. Blaise Pascal \textbf{10} (2003), 75--106.
+
+\bibitem{Shoikhet2001}
+B.~Shoikhet,
+\emph{Vanishing of the Kontsevich integrals of the wheels},
+Lett. Math. Phys. \textbf{56} (2001), 141--149.
+
+\bibitem{Tamarkin}
+D.~Tamarkin,
+\emph{Another proof of M.~Kontsevich formality theorem},
+arXiv:math/9803025 (1998).
+
+\end{thebibliography}
+\endgroup
+
+\end{document}
