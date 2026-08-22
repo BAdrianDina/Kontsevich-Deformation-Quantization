@@ -6,6 +6,8 @@ import Kontsevich.Workstreams.E_KontsevichFormula.Basic
 import Kontsevich.Workstreams.F_AnalyticInput.Basic
 import Kontsevich.LInfty.Algebra
 
+set_option linter.style.header false
+
 /-!
 # Global Kontsevich implementation path
 
