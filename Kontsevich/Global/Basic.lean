@@ -4,6 +4,7 @@ import Kontsevich.Workstreams.C_HKR.Basic
 import Kontsevich.Workstreams.D_LInfinityMC.Basic
 import Kontsevich.Workstreams.E_KontsevichFormula.Basic
 import Kontsevich.Workstreams.F_AnalyticInput.Basic
+import Kontsevich.LInfty.Algebra
 
 /-!
 # Global Kontsevich implementation path
