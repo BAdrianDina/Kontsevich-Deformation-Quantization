@@ -12,7 +12,7 @@ import Mathlib.Tactic.Ring
 # `L∞`-algebras with Koszul signs
 
 An `L∞`-algebra on a `ℤ`-graded `K`-module `L` is a family of
-graded antisymmetric multilinear maps `Qₙ : L^{⊗n} → L` of degree `2 - n` (`n ≥ 1`)
+graded skew-symmetric multilinear maps `Qₙ : L^{⊗n} → L` of degree `2 - n` (`n ≥ 1`)
 satisfying the generalized Jacobi identities
 ```
 ∑_{i+j=n+1} ∑_{σ ∈ Sh(i,n-i)} ± Q_j(Q_i(x_{σ(1)}, …, x_{σ(i)}), x_{σ(i+1)}, …, x_{σ(n)}) = 0.
@@ -29,6 +29,13 @@ homogeneous elements, which determine them by multilinearity. This avoids all de
 casts between `𝒜 i` and `𝒜 j`. (Mathlib's `AlternatingMap` is not suitable, since graded
 antisymmetry carries Koszul signs, so the `Qₙ` are not alternating on `V`.)
 
+The definitions only assume that `K` is a commutative ring. Over a ring in which `2` is
+invertible (in particular, over the characteristic-zero fields used for deformation quantization),
+these graded skew-symmetric maps have the expected interpretation as maps out of the graded
+exterior power. Over a general commutative ring, permutation skew-symmetry need not force the
+additional alternating relations in characteristic two; the multilinear-map formulation below is
+the structure that is meant in that generality.
+
 ## Assumptions and convention
 
 * **(S1) Koszul sign.** Degrees are integers. For `σ ∈ Sₙ` and homogeneous `x₁, …, xₙ` of
@@ -42,14 +49,18 @@ antisymmetry carries Koszul signs, so the `Qₙ` are not alternating on `V`.)
 * **(S3) Shuffles.** `Sh(i, n-i)` is the set of `σ ∈ Sₙ` with `σ(1) < ⋯ < σ(i)` and
   `σ(i+1) < ⋯ < σ(n)` (`shuffles n i`).
 * **(S4) Jacobi sign.** The `(i, j, σ)`-term of the generalized Jacobi identity carries the
-  sign `(-1)^{i(j-1)} χ(σ; d)` (`jacobiSign`), so that Definition 3.1 is read as
+  sign `(-1)^{i(j-1)} χ(σ; d)` (`jacobiSign`), so the identity used in this file is
   ```
   ∑_{i+j=n+1} ∑_{σ ∈ Sh(i,n-i)} (-1)^{i(j-1)} χ(σ; x)
       Q_j(Q_i(x_{σ(1)}, …, x_{σ(i)}), x_{σ(i+1)}, …, x_{σ(n)}) = 0.
   ```
-  This is the convention of Lada–Markl [LM95]; it is the antisymmetric
-  (décalage) form of Kontsevich's description [K03] of an `L∞`-structure as a
-  degree-one codifferential on the symmetric coalgebra of `L[1]`.
+  This is the cohomological version of Lada–Markl [LM95, Definition 2.1]. Lada–Markl use
+  operations of degree `n - 2`; reversing the grading gives degree `2 - n` and leaves all parity
+  signs unchanged. It is the antisymmetric (décalage) form of Kontsevich's definition
+  [K03, Definition 4.3] by a degree-one square-zero coderivation on the symmetric coalgebra of
+  `L[1]`. The displayed generalized Jacobi identity in the project formalization note omits the
+  factor `(-1)^{i(j-1)}`; that factor is necessary for the `n = 2` identity to be the usual
+  dg-Lie Leibniz rule with `Q₁ = d` and `Q₂ = [·,·]`.
 * **(S5) Consequence (Example 3.2).** A dg Lie algebra `(L, d, [·,·])` is an `L∞`-algebra
   with `Q₁ = d`, `Q₂ = [·,·]`, `Qₙ = 0` for `n ≥ 3`, with no further signs: the `n = 1, 2, 3`
   identities are `d² = 0`, the graded Leibniz rule `d[x,y] = [dx,y] + (-1)^{|x|}[x,dy]`, and
@@ -75,10 +86,16 @@ antisymmetry carries Koszul signs, so the `Qₙ` are not alternating on `V`.)
   Jacobi sums (the shuffles of `Fin n`, `n ≤ 3`, are enumerated by `decide`), and
   `jacobiSum_eq_zero_of_le_two`. For `n ≥ 4` the identity is vacuous when `Qₘ = 0` for
   `m ≥ 3`.
+* `koszulSign_eq_of_even_sub`, `antisymmKoszulSign_eq_of_even_sub`, and
+  `jacobiSign_eq_of_even_sub`: all three signs depend only on degree parity.
+* `LInftyAlgebra.antisymm_comp`, `LInftyAlgebra.antisymm_cocycle_smul`, and
+  `LInftyAlgebra.antisymm_inv`: composition, cocycle, and inverse reindexing rules for arbitrary
+  permutations of homogeneous arguments.
 * `LInftyAlgebra.jacobi_one`, `LInftyAlgebra.d_comp_d` (`Q₁² = 0`),
   `LInftyAlgebra.jacobi_two`, `LInftyAlgebra.leibniz`, `LInftyAlgebra.d_bracket` (graded
-  Leibniz rule), `LInftyAlgebra.jacobi_three`, `LInftyAlgebra.jacobi_of_Q_three_eq_zero`,
-  `LInftyAlgebra.bracket_bracket_of_Q_three_eq_zero` (graded Jacobi up to the homotopy `Q₃`),
+  Leibniz rule), `LInftyAlgebra.jacobi_three`, `LInftyAlgebra.jacobiator_eq_Q_three` (graded
+  Jacobi up to the homotopy `Q₃`), `LInftyAlgebra.jacobi_of_Q_three_eq_zero`, and
+  `LInftyAlgebra.bracket_bracket_of_Q_three_eq_zero` (graded Jacobi when `Q₃ = 0`),
   `LInftyAlgebra.antisymm_two`, `LInftyAlgebra.bracket_antisymm`.
 
 ## References
@@ -122,6 +139,127 @@ def jacobiSign (i j : ℕ) {n : ℕ} (σ : Perm (Fin n)) (d : Fin n → ℤ) : �
 @[simp] lemma antisymmKoszulSign_one {n : ℕ} (d : Fin n → ℤ) :
     antisymmKoszulSign (1 : Perm (Fin n)) d = 1 := by
   simp [antisymmKoszulSign]
+
+/-- Koszul signs depend only on the degree function, not on its presentation. -/
+lemma koszulSign_congr {n : ℕ} (σ : Perm (Fin n)) {d e : Fin n → ℤ}
+    (h : ∀ i, d i = e i) :
+    koszulSign σ d = koszulSign σ e := by
+  congr 2
+  funext i
+  exact h i
+
+/-- Antisymmetric Koszul signs depend only on the degree function, not on its presentation. -/
+lemma antisymmKoszulSign_congr {n : ℕ} (σ : Perm (Fin n)) {d e : Fin n → ℤ}
+    (h : ∀ i, d i = e i) :
+    antisymmKoszulSign σ d = antisymmKoszulSign σ e := by
+  rw [antisymmKoszulSign, antisymmKoszulSign, koszulSign_congr σ h]
+
+/-- `Int.negOnePow` takes finite sums to products. -/
+lemma negOnePow_sum {ι : Type*} (s : Finset ι) (f : ι → ℤ) :
+    Int.negOnePow (∑ i ∈ s, f i) = ∏ i ∈ s, Int.negOnePow (f i) := by
+  classical
+  induction s using Finset.induction with
+  | empty => simp
+  | insert i s hi ih => simp [hi, Int.negOnePow_add, ih]
+
+/-- Products of degrees have the same parity when the individual degrees do. -/
+lemma even_degree_mul_sub {p q p' q' : ℤ} (hp : Even (p - p')) (hq : Even (q - q')) :
+    Even (p * q - p' * q') := by
+  rcases hp with ⟨u, hu⟩
+  rcases hq with ⟨v, hv⟩
+  refine ⟨u * q + p' * v, ?_⟩
+  calc
+    p * q - p' * q' = (p - p') * q + p' * (q - q') := by ring
+    _ = (u + u) * q + p' * (v + v) := by rw [hu, hv]
+    _ = (u * q + p' * v) + (u * q + p' * v) := by ring
+
+/-- Koszul signs only depend on the parities of the degrees. -/
+lemma koszulSign_eq_of_even_sub {n : ℕ} (σ : Perm (Fin n)) {d e : Fin n → ℤ}
+    (h : ∀ i, Even (d i - e i)) : koszulSign σ d = koszulSign σ e := by
+  classical
+  let term (d' : Fin n → ℤ) (a b : Fin n) :=
+    if a < b ∧ σ b < σ a then d' (σ a) * d' (σ b) else 0
+  have hterm : ∀ a b, Int.negOnePow (term d a b) = Int.negOnePow (term e a b) := by
+    intro a b
+    by_cases hab : a < b ∧ σ b < σ a
+    · simp only [term, if_pos hab]
+      rw [Int.negOnePow_eq_iff]
+      exact even_degree_mul_sub (h (σ a)) (h (σ b))
+    · simp [term, hab]
+  unfold koszulSign
+  change Int.negOnePow (∑ a, ∑ b, term d a b) =
+    Int.negOnePow (∑ a, ∑ b, term e a b)
+  calc
+    Int.negOnePow (∑ a, ∑ b, term d a b) =
+        ∏ a, ∏ b, Int.negOnePow (term d a b) := by
+      rw [negOnePow_sum]
+      apply Finset.prod_congr rfl
+      intro a _
+      rw [negOnePow_sum]
+    _ = ∏ a, ∏ b, Int.negOnePow (term e a b) := by
+      apply Finset.prod_congr rfl
+      intro a _
+      apply Finset.prod_congr rfl
+      intro b _
+      exact hterm a b
+    _ = Int.negOnePow (∑ a, ∑ b, term e a b) := by
+      rw [negOnePow_sum]
+      apply Eq.symm
+      apply Finset.prod_congr rfl
+      intro a _
+      rw [negOnePow_sum]
+
+/-- Antisymmetric Koszul signs only depend on the parities of the degrees. -/
+lemma antisymmKoszulSign_eq_of_even_sub {n : ℕ} (σ : Perm (Fin n)) {d e : Fin n → ℤ}
+    (h : ∀ i, Even (d i - e i)) : antisymmKoszulSign σ d = antisymmKoszulSign σ e := by
+  simp only [antisymmKoszulSign, koszulSign_eq_of_even_sub σ h]
+
+/-- Adding an arbitrary even integer to every degree does not change a Koszul sign. -/
+lemma koszulSign_add_two_mul {n : ℕ} (σ : Perm (Fin n)) (d k : Fin n → ℤ) :
+    koszulSign σ (fun i ↦ d i + 2 * k i) = koszulSign σ d := by
+  apply koszulSign_eq_of_even_sub
+  intro i
+  exact ⟨k i, by ring⟩
+
+/-- Adding an arbitrary even integer to every degree does not change an antisymmetric Koszul
+sign. -/
+lemma antisymmKoszulSign_add_two_mul {n : ℕ} (σ : Perm (Fin n)) (d k : Fin n → ℤ) :
+    antisymmKoszulSign σ (fun i ↦ d i + 2 * k i) = antisymmKoszulSign σ d := by
+  apply antisymmKoszulSign_eq_of_even_sub
+  intro i
+  exact ⟨k i, by ring⟩
+
+/-- Reversing every grading degree does not change a Koszul sign. This records that all signs
+only depend on products of pairs of degrees. -/
+@[simp] lemma koszulSign_neg {n : ℕ} (σ : Perm (Fin n)) (d : Fin n → ℤ) :
+    koszulSign σ (-d) = koszulSign σ d := by
+  simp only [koszulSign, Pi.neg_apply, neg_mul_neg]
+
+/-- Reversing every grading degree does not change an antisymmetric Koszul sign. -/
+@[simp] lemma antisymmKoszulSign_neg {n : ℕ} (σ : Perm (Fin n)) (d : Fin n → ℤ) :
+    antisymmKoszulSign σ (-d) = antisymmKoszulSign σ d := by
+  simp [antisymmKoszulSign]
+
+/-- For a tuple concentrated in even degree zero, the antisymmetric Koszul sign is the ordinary
+signature of the permutation. -/
+@[simp] lemma koszulSign_zero {n : ℕ} (σ : Perm (Fin n)) :
+    koszulSign σ (0 : Fin n → ℤ) = 1 := by
+  simp [koszulSign]
+
+@[simp] lemma antisymmKoszulSign_zero {n : ℕ} (σ : Perm (Fin n)) :
+    antisymmKoszulSign σ (0 : Fin n → ℤ) = Perm.sign σ := by
+  simp [antisymmKoszulSign]
+
+/-- Reversing every grading degree does not change a generalized-Jacobi sign. -/
+@[simp] lemma jacobiSign_neg (i j : ℕ) {n : ℕ} (σ : Perm (Fin n)) (d : Fin n → ℤ) :
+    jacobiSign i j σ (-d) = jacobiSign i j σ d := by
+  simp [jacobiSign]
+
+/-- Generalized-Jacobi signs only depend on the parities of the input degrees. -/
+lemma jacobiSign_eq_of_even_sub (i j : ℕ) {n : ℕ} (σ : Perm (Fin n))
+    {d e : Fin n → ℤ} (h : ∀ k, Even (d k - e k)) :
+    jacobiSign i j σ d = jacobiSign i j σ e := by
+  simp only [jacobiSign, antisymmKoszulSign_eq_of_even_sub σ h]
 
 lemma koszulSign_swap_two (d : Fin 2 → ℤ) :
     koszulSign (swap 0 1) d = Int.negOnePow (d 0 * d 1) := by
@@ -195,6 +333,13 @@ lemma shuffles_three_three : shuffles 3 3 = {1} := by decide
 /-- Precomposition with the transposition of `Fin 2` swaps the two entries. -/
 lemma comp_swap_two {α : Type*} (x : Fin 2 → α) : x ∘ swap 0 1 = ![x 1, x 0] := by
   funext k; fin_cases k <;> simp
+
+/-- Successive reindexing by `σ` and then `τ` is reindexing by the product `σ * τ`.
+This fixes the order convention used by all permutation-sign lemmas below. -/
+lemma comp_perm_mul {α : Type*} {n : ℕ} (x : Fin n → α) (σ τ : Perm (Fin n)) :
+    x ∘ ⇑(σ * τ) = (x ∘ σ) ∘ τ := by
+  funext i
+  rfl
 
 /-! ### The generalized Jacobi sum -/
 
@@ -331,8 +476,13 @@ end LInfty
 open LInfty
 
 /-- An `L∞`-algebra structure on the `ℤ`-graded `K`-module `V = ⨁ i, 𝒜 i`: operations
-`Qₙ : V^n → V` of degree `2 - n`, graded antisymmetric, satisfying the generalized Jacobi
-identities, with the sign conventions (S1)–(S4) of the module docstring. -/
+`Qₙ : V^n → V` of degree `2 - n`, graded skew-symmetric, satisfying the generalized Jacobi
+identities, with the sign conventions (S1)–(S4) of the module docstring.
+
+Over an arbitrary `CommRing K`, "graded skew-symmetric" means precisely the permutation law in
+the `antisymm` field. Its identification with a map from a graded exterior power requires the
+usual extra hypotheses excluding the characteristic-two distinction between skew-symmetric and
+alternating maps. -/
 @[ext]
 structure LInftyAlgebra (K : Type*) [CommRing K] {V : Type*} [AddCommGroup V] [Module K V]
     (𝒜 : ℤ → Submodule K V) [DirectSum.Decomposition 𝒜] where
@@ -365,6 +515,48 @@ def trivial : LInftyAlgebra K 𝒜 where
   jacobi _ := by simp [jacobiSum, jacobiTerm]
 
 instance : Inhabited (LInftyAlgebra K 𝒜) := ⟨trivial⟩
+
+/-! ### Reindexing homogeneous arguments -/
+
+/-- Applying graded antisymmetry successively first by `σ` and then by `τ`. Besides being a
+convenient reindexing rule, this theorem records which transformed degree function occurs in the
+Koszul sign for the second permutation. -/
+theorem antisymm_comp {n : ℕ} {dg : Fin n → ℤ} {v : Fin n → V}
+    (hv : ∀ i, v i ∈ 𝒜 (dg i)) (σ τ : Equiv.Perm (Fin n)) :
+    L.Q n (v ∘ ⇑(σ * τ)) =
+      antisymmKoszulSign τ (dg ∘ σ) • (antisymmKoszulSign σ dg • L.Q n v) := by
+  rw [comp_perm_mul]
+  rw [L.antisymm (d := dg ∘ σ) (x := v ∘ σ) (fun i ↦ hv (σ i)) τ,
+    L.antisymm hv σ]
+
+/-- The combined scalar in `antisymm_comp`, useful when comparing a composite permutation with a
+single permutation. -/
+theorem antisymm_comp' {n : ℕ} {dg : Fin n → ℤ} {v : Fin n → V}
+    (hv : ∀ i, v i ∈ 𝒜 (dg i)) (σ τ : Equiv.Perm (Fin n)) :
+    L.Q n (v ∘ ⇑(σ * τ)) =
+      (antisymmKoszulSign τ (dg ∘ σ) * antisymmKoszulSign σ dg) • L.Q n v := by
+  simpa only [mul_smul] using L.antisymm_comp hv σ τ
+
+/-- The cocycle law for permutation signs, stated at exactly the level needed by an
+`LInftyAlgebra`: the sign of the composite and the product of the two successive signs have the
+same action on the value of every homogeneous operation. This formulation remains valid over an
+arbitrary commutative base ring, where scalar actions need not be cancellable. -/
+theorem antisymm_cocycle_smul {n : ℕ} {dg : Fin n → ℤ} {v : Fin n → V}
+    (hv : ∀ i, v i ∈ 𝒜 (dg i)) (σ τ : Equiv.Perm (Fin n)) :
+    antisymmKoszulSign (σ * τ) dg • L.Q n v =
+      (antisymmKoszulSign τ (dg ∘ σ) * antisymmKoszulSign σ dg) • L.Q n v := by
+  rw [← L.antisymm hv (σ * τ)]
+  exact L.antisymm_comp' hv σ τ
+
+/-- The inverse form of graded antisymmetry. The degrees on the permuted tuple are `dg ∘ σ`. -/
+theorem antisymm_inv {n : ℕ} {dg : Fin n → ℤ} {v : Fin n → V}
+    (hv : ∀ i, v i ∈ 𝒜 (dg i)) (σ : Equiv.Perm (Fin n)) :
+    L.Q n v = antisymmKoszulSign σ⁻¹ (dg ∘ σ) • L.Q n (v ∘ σ) := by
+  have h := L.antisymm (d := dg ∘ σ) (x := v ∘ σ) (fun i ↦ hv (σ i)) σ⁻¹
+  have heq : (v ∘ σ) ∘ ⇑(σ⁻¹) = v := by
+    funext i
+    simp
+  simpa only [heq] using h
 
 /-! ### The differential and the bracket as (bi)linear maps -/
 
@@ -404,7 +596,7 @@ lemma d_mem (hx : x ∈ 𝒜 a) : L.d x ∈ 𝒜 (a + 1) := by
 lemma bracket_mem (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) : L.bracket x y ∈ 𝒜 (a + b) := by
   simpa using L.Q_two_mem hx hy
 
-/-! ### Antisymmetry in arity two -/
+/-! ### Antisymmetry in low arities -/
 
 theorem antisymm_two (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) :
     L.Q 2 ![y, x] = -(Int.negOnePow (a * b) • L.Q 2 ![x, y]) := by
@@ -416,6 +608,38 @@ theorem antisymm_two (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) :
 theorem bracket_antisymm (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) :
     L.bracket y x = -(Int.negOnePow (a * b) • L.bracket x y) := by
   simpa using L.antisymm_two hx hy
+
+/-- Swapping the first two arguments of `Q₃`. -/
+theorem antisymm_three_swap₀₁ (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) (hz : z ∈ 𝒜 c) :
+    L.Q 3 ![y, x, z] = -(Int.negOnePow (a * b) • L.Q 3 ![x, y, z]) := by
+  have h := L.antisymm (d := ![a, b, c]) (x := ![x, y, z])
+    (by simp [Fin.forall_fin_succ, hx, hy, hz]) (Equiv.swap 0 1)
+  rw [show ![x, y, z] ∘ Equiv.swap 0 1 = ![y, x, z] by
+      funext k; fin_cases k <;> simp +decide [Equiv.swap_apply_def],
+    antisymmKoszulSign_swap₀₁_three] at h
+  simpa [Units.neg_smul] using h
+
+/-- Swapping the last two arguments of `Q₃`. -/
+theorem antisymm_three_swap₁₂ (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) (hz : z ∈ 𝒜 c) :
+    L.Q 3 ![x, z, y] = -(Int.negOnePow (b * c) • L.Q 3 ![x, y, z]) := by
+  have h := L.antisymm (d := ![a, b, c]) (x := ![x, y, z])
+    (by simp [Fin.forall_fin_succ, hx, hy, hz]) (Equiv.swap 1 2)
+  rw [show ![x, y, z] ∘ Equiv.swap 1 2 = ![x, z, y] by
+      funext k; fin_cases k <;> simp +decide [Equiv.swap_apply_def],
+    antisymmKoszulSign_swap₁₂_three] at h
+  simpa [Units.neg_smul] using h
+
+/-- Moving the last argument of `Q₃` to the front. This even permutation has only its Koszul
+sign. -/
+theorem antisymm_three_cycle_left (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) (hz : z ∈ 𝒜 c) :
+    L.Q 3 ![z, x, y] = Int.negOnePow (c * (a + b)) • L.Q 3 ![x, y, z] := by
+  have h := L.antisymm (d := ![a, b, c]) (x := ![x, y, z])
+    (by simp [Fin.forall_fin_succ, hx, hy, hz]) (Equiv.swap 1 2 * Equiv.swap 0 1)
+  rw [show ![x, y, z] ∘
+      ⇑(Equiv.swap 1 2 * Equiv.swap 0 1 : Equiv.Perm (Fin 3)) = ![z, x, y] by
+      funext k; fin_cases k <;> simp +decide [Equiv.swap_apply_def],
+    antisymmKoszulSign_cycle_left_three] at h
+  simpa [mul_add] using h
 
 /-! ### The `n = 1` identity: `Q₁² = 0` -/
 
@@ -479,25 +703,53 @@ theorem jacobi_three (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) (hz : z ∈ 𝒜 c)
   rw [show c * (a + b) = c * a + c * b by ring, show a * (b + c) = b * a + c * a by ring]
   exact this
 
+/-- The conventional form of the `n = 3` identity: the graded Jacobiator of `Q₂` is the
+chain-homotopy supplied by `Q₃`. All occurrences of a differentiated argument have been moved
+back to its original position, so the four signs on the right are the standard cochain signs. -/
+theorem jacobiator_eq_Q_three (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b) (hz : z ∈ 𝒜 c) :
+    L.bracket x (L.bracket y z) - L.bracket (L.bracket x y) z
+        - Int.negOnePow (a * b) • L.bracket y (L.bracket x z) =
+      L.d (L.Q 3 ![x, y, z]) + L.Q 3 ![L.d x, y, z]
+        + Int.negOnePow a • L.Q 3 ![x, L.d y, z]
+        + Int.negOnePow (a + b) • L.Q 3 ![x, y, L.d z] := by
+  have h := L.jacobi_three hx hy hz
+  rw [L.antisymm_two hy (L.Q_two_mem hx hz), L.antisymm_two hx (L.Q_two_mem hy hz),
+    smul_neg, smul_neg, smul_smul, smul_smul, ← Int.negOnePow_add, ← Int.negOnePow_add] at h
+  have e₁ : Int.negOnePow (b * c + b * (a + c)) = Int.negOnePow (a * b) := by
+    rw [Int.negOnePow_eq_iff]
+    exact ⟨b * c, by ring⟩
+  have e₂ : Int.negOnePow (a * (b + c) + a * (b + c)) = 1 := by
+    rw [Int.negOnePow_eq_one_iff]
+    exact ⟨a * (b + c), by ring⟩
+  rw [e₁, e₂, one_smul] at h
+  rw [L.antisymm_three_swap₀₁ hx (L.Q_one_mem hy) hz,
+    L.antisymm_three_cycle_left hx hy (L.Q_one_mem hz), smul_neg, smul_smul, smul_smul] at h
+  simp only [sub_neg_eq_add] at h
+  have e₃ : Int.negOnePow (a * b) * Int.negOnePow (a * (b + 1)) = Int.negOnePow a := by
+    rw [← Int.negOnePow_add, Int.negOnePow_eq_iff]
+    exact ⟨a * b, by ring⟩
+  have e₄ : Int.negOnePow (c * (a + b)) * Int.negOnePow ((c + 1) * (a + b)) =
+      Int.negOnePow (a + b) := by
+    rw [← Int.negOnePow_add, Int.negOnePow_eq_iff]
+    exact ⟨c * (a + b), by ring⟩
+  rw [e₃, e₄] at h
+  simp only [d_apply, bracket_apply]
+  rw [eq_comm, ← sub_eq_zero]
+  abel_nf at h ⊢
+  exact h
+
 /-- When `Q₃ = 0` (for instance for a dg Lie algebra), the `n = 3` identity is the graded
 Jacobi identity `[x, [y, z]] = [[x, y], z] + (-1)^{|x||y|} [y, [x, z]]`. -/
 theorem jacobi_of_Q_three_eq_zero (h₃ : L.Q 3 = 0) (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b)
     (hz : z ∈ 𝒜 c) :
     L.Q 2 ![x, L.Q 2 ![y, z]] =
       L.Q 2 ![L.Q 2 ![x, y], z] + Int.negOnePow (a * b) • L.Q 2 ![y, L.Q 2 ![x, z]] := by
-  have h := L.jacobi_three hx hy hz
-  have h0 : L.Q 1 ![(0 : V)] = 0 := (L.Q 1).map_coord_zero 0 rfl
-  simp only [h₃, zero_apply, smul_zero, sub_zero, add_zero, zero_add, h0] at h
-  rw [L.antisymm_two hy (L.Q_two_mem hx hz), L.antisymm_two hx (L.Q_two_mem hy hz),
-    smul_neg, smul_neg, smul_smul, smul_smul, ← Int.negOnePow_add, ← Int.negOnePow_add] at h
-  have e₁ : Int.negOnePow (b * c + b * (a + c)) = Int.negOnePow (a * b) := by
-    rw [Int.negOnePow_eq_iff]; exact ⟨b * c, by ring⟩
-  have e₂ : Int.negOnePow (a * (b + c) + a * (b + c)) = 1 := by
-    rw [Int.negOnePow_eq_one_iff]; exact ⟨a * (b + c), by ring⟩
-  rw [e₁, e₂, one_smul] at h
-  rw [eq_comm, ← sub_eq_zero]
-  exact (show L.Q 2 ![L.Q 2 ![x, y], z] + Int.negOnePow (a * b) • L.Q 2 ![y, L.Q 2 ![x, z]]
-      - L.Q 2 ![x, L.Q 2 ![y, z]] = _ by abel).trans h
+  have h := L.jacobiator_eq_Q_three hx hy hz
+  simp only [h₃, zero_apply, map_zero, smul_zero, add_zero] at h
+  simp only [bracket_apply] at h ⊢
+  rw [← sub_eq_zero]
+  abel_nf at h ⊢
+  exact h
 
 /-- The graded Jacobi identity in terms of `bracket`, when `Q₃ = 0`. -/
 theorem bracket_bracket_of_Q_three_eq_zero (h₃ : L.Q 3 = 0) (hx : x ∈ 𝒜 a) (hy : y ∈ 𝒜 b)
