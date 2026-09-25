@@ -1,0 +1,40 @@
+name: Lean CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+
+      - name: Build
+        run: lake build
+
+      - name: Check for sorry
+        run: |
+          if grep -R -n -E '(^|[^A-Za-z0-9_])sorry([^A-Za-z0-9_]|$)' Kontsevich --include='*.lean'; then
+            echo "Found sorry in Lean source."
+            exit 1
+          fi
+
+      - name: Check for axioms
+        run: |
+          if grep -R -n -E '^[[:space:]]*axiom[[:space:]]+' Kontsevich --include='*.lean'; then
+            echo "Found axiom in Lean source."
+            exit 1
+          fi
